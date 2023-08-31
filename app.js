@@ -123,6 +123,14 @@ app.get("/submit", (req, res) => {
     }
 });
 
+app.get("/failedLogin", (req, res) => {
+    res.render("failedLogin");
+});
+
+app.get("/failedRegister", (req, res) => {
+    res.render("failedRegister");
+})
+
 //POST requests
 app.post("/register", (req, res) => {
     User.register({ username: req.body.username }, req.body.password)
@@ -137,6 +145,7 @@ app.post("/register", (req, res) => {
             });
         })
         .catch((error) => {
+            res.redirect("/failedRegister");
             console.error("Error registering the user:", error);
         });
 });
@@ -144,7 +153,7 @@ app.post("/register", (req, res) => {
 
 app.post("/login", passport.authenticate("local", {
     successRedirect: "/secrets",
-    failureRedirect: "/login",
+    failureRedirect: "/failedLogin",
 }));
 
 app.post("/submit", (req, res) => {
