@@ -6,8 +6,8 @@ const app = express();
 const bodyParser = require("body-parser");
 const passport = require("passport");
 const session = require("express-session");
-const GoogleStrategy = require("passport-google-oauth20");
-
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const GitHubStrategy = require("passport-github2").Strategy
 //Middleware Setup
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
@@ -43,6 +43,19 @@ passport.use(new GoogleStrategy({
     })
 );
 
+passport.use(new GitHubStrategy({
+    clientID: process.env.GITHUB_CLIENT_ID,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/auth/github/secrets"
+},
+    function (accessToken, refreshToken, profile, done) {
+        console.log("GitHub Profile", profile.id);
+        User.findOrCreate({ githubId: profile.id }, function (err, user) {
+            return done(err, user);
+        });
+    }
+));
+
 //Setting up routes
 
 //GET requests
@@ -51,6 +64,15 @@ app.get("/auth/google", passport.authenticate("google", { scope: ["profile"] }))
 app.get("/auth/google/secrets", passport.authenticate("google", { failureRedirect: "/login" }), (req, res) => {
     res.redirect("/secrets");
 });
+
+app.get('/auth/github',
+    passport.authenticate("github", { scope: ["profile"] }));
+
+app.get('/auth/github/secrets',
+    passport.authenticate('github', { failureRedirect: '/login' }),
+    function (req, res) {
+        res.redirect("/secrets");
+    });
 
 app.get("/", (req, res) => {
     if (req.isAuthenticated()) {
@@ -63,10 +85,9 @@ app.get("/", (req, res) => {
 app.get("/secrets", (req, res) => {
     if (req.isAuthenticated()) {
         User.findOne({
-            $or: [{ googleId: req.user.googleId }, { username: req.user.username }]
+            $or: [{ googleId: req.user.googleId }, { username: req.user.username }, { githubId: req.user.githubId }]
         })
             .then((user) => {
-                console.log(user);
                 const data = {
                     secrets: user.secrets,
                 }
@@ -128,7 +149,7 @@ app.post("/login", passport.authenticate("local", {
 
 app.post("/submit", (req, res) => {
     User.findOne({
-        $or: [{ googleId: req.user.googleId }, { username: req.user.username }]
+        $or: [{ googleId: req.user.googleId }, { username: req.user.username }, { githubId: req.user.githubId }]
     })
         .then((user) => {
             user.secrets.push(req.body.secret);
